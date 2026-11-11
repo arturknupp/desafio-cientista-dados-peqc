@@ -1,206 +1,280 @@
-# Desafio Técnico - Cientista de Dados
+# Desafio Técnico - Cientista de Dados - Artur Knupp
 
-## Registro Municipal Integrado (RMI)
 
----
+## Sobre o projeto
 
-## Contexto
+Este projeto de engenharia de dados implementa um pipeline utilizando **dbt (Data Build Tool)** e data warehouse **Google BigQuery** com foco na preparação, tranformação e análise dos dados educacionais fornecidos pela Prefeitura do Rio. 
 
-O **Registro Municipal Integrado (RMI)** é o data warehouse estratégico da Prefeitura do Rio de Janeiro, que consolida dados de saúde, educação, assistência social e dezenas de outros sistemas municipais. A qualidade, confiabilidade e rastreabilidade desses dados são fundamentais para políticas públicas baseadas em evidências.
+Os dados possuem informações referentes aos alunos, turmas, escolas, avaliações e a frequência escolar. A partir disto, o objetivo é a estruturação dos dados fornecidos aplicando regras de qualidade e transformações com a finalidade de produzir indicadores úteis para auxílio em diversos aspectos a vivência escolar. 
 
-Como Cientista de Dados, você liderará a modelagem analítica e a governança de dados que orientam decisões para milhões de cariocas. A **engenharia de analytics** — transformação, teste e documentação de dados — é a espinha dorsal da função.
+O projeto utiliza uma arquitetura em camadas (**staging**, **intermediate** e **marts**).
 
-Este desafio avalia suas habilidades em **modelagem de dados com dbt**, estratégia de testes e qualidade, SQL analítico e documentação técnica, usando dados educacionais anonimizados que simulam o contexto real do RMI.
+## Tecnologias utilizadas
 
----
+- **Google BigQuery:** Data Warehouse.
+- **dbt Core:** Transformação e orquestração dos modelos SQL.
+- **SQL:** Linguagem de transformação e consulta.
+- **Git/GitHub:** Versionamento do projeto.
 
-## Instruções
+## Premissas
 
-1. Faça um fork do repositório do desafio para colocar a sua solução
-2. Organize o projeto seguindo as boas práticas de dbt descritas abaixo
-3. Inclua **README.md** explicando abordagem, decisões de arquitetura e como reproduzir
-4. **Entrega**: Siga as instruções de entrega enviadas por email
+O projeto possui duas premissas:
 
----
+- **Arquivo `~/.dbt/profiles.yml` deve estar devidamente configurado com a conexão do warehouse.** 
+- **O dbt já deve estar instalado com uma versão compatível.**
+- **Que os dados fonte já estejam carregados no warehouse BigQuery no mesmo formato fonecido.** 
+- **As credênciais do banco se encontram configuradas no arquivo **env_variables.sh**, que tem a finalidade expostar variáveis de ambiente como o nome do projeto e o nome do dataset.** 
 
-## Dados
+## Setup
+### Clonar o repositório
 
-Os dados deste desafio representam registros educacionais da rede municipal, **anonimizados e aleatorizados** para fins de avaliação. Eles foram disponibilizados como arquivos Parquet em um bucket do Google Cloud Storage (GCS).
-
-### Tabelas Disponíveis
-
-| Arquivo (GCS) | Descrição | Granularidade |
-|----------------|-----------|---------------|
-| `aluno.parquet` | Cadastro de alunos (IDs anonimizados, faixa etária, bairro anonimizado) | 1 linha por aluno |
-| `escola.parquet` | Cadastro de unidades escolares (IDs anonimizados, tipo, região) | 1 linha por escola |
-| `turma.parquet` | Informações de turmas (série, turno, ano letivo) | 1 linha por turma |
-| `frequencia.parquet` | Registros de frequência escolar | 1 linha por aluno/dia |
-| `avaliacao.parquet` | Notas e avaliações por bimestre | 1 linha por aluno/disciplina/bimestre |
-
-### Tabela Auxiliar Pública
-
-| Tabela (BigQuery) | Descrição |
-|--------------------|-----------|
-| `datario.dados_mestres.bairro` | Cadastro de bairros do Rio de Janeiro |
-
-### Acesso aos dados
-
-Os arquivos Parquet estão disponíveis no bucket GCS:
-
-```
-https://console.cloud.google.com/storage/browser/case_vagas/rmi
+```bash
+git clone git@github.com:arturknupp/desafio-cientista-dados-peqc.git
+cd desafio_rmi_ds
 ```
 
-Alternativamente, os arquivos podem ser carregados diretamente em um dataset BigQuery pessoal para uso com dbt-bigquery (veja instruções no FAQ).
+**Observação:** Não foi possível utilizar o nome recomendado **desafio-rmi-ds** pois o **dbt init** não aceitava hífen.
 
-**⚠️ IMPORTANTE sobre os dados:**
+### Autenticação no Google Cloud
 
-- Os dados foram **anonimizados**: todos os identificadores pessoais (nomes, CPFs, endereços) foram removidos e substituídos por IDs sintéticos
-- Os valores numéricos foram **aleatorizados** (com preservação de distribuições e relações entre tabelas)
-- **Não tente reidentificar** registros ou cruzar com fontes externas
-- Os dados servem para avaliar sua capacidade técnica de modelagem, não para gerar insights reais sobre a rede educacional
+Para autenticação local via OAuth:
 
----
-
-## Parte 1: Projeto dbt e Modelagem
-
-**Construa um projeto dbt do zero** (`dbt-core` + adapter de sua escolha) que transforme os dados brutos em camadas analíticas.
-
-### 1. Configuração e Estrutura do Projeto
-
-Configure o projeto dbt com sources apontando para os dados disponibilizados. Organize os models seguindo a convenção de camadas staging → intermediate → marts.
-
-**Entregue**: Projeto dbt funcional (`dbt run` executa sem erros), com `dbt_project.yml` configurado, sources definidas e estrutura de diretórios organizada.
-
-### 2. Camada de Staging
-
-Crie models de staging para **pelo menos 4 tabelas** fonte. Aplique limpeza, padronização de nomes, tipagem, tratamento de nulos e filtros básicos de qualidade.
-
-**Entregue**: Models de staging com naming convention consistente, lógica de limpeza documentada e `schema.yml` com descrições das sources e colunas.
-
-### 3. Camada Intermediate
-
-Crie **pelo menos 1 model intermediate** que combine dados de múltiplas fontes. Por exemplo: um modelo que una alunos + matrículas + frequência para calcular métricas de presença por aluno/período.
-
-**Entregue**: Model(s) intermediate com lógica de join documentada (premissas, tipo de join, tratamento de registros órfãos) e justificativa das decisões de modelagem.
-
-### 4. Camada de Marts
-
-Construa **pelo menos 1 mart** orientado a responder uma pergunta analítica relevante para gestores públicos. Sugestões (ou proponha a sua):
-
-- **Absenteísmo crônico por região:** Quais escolas/regiões têm maior taxa de alunos com frequência abaixo de 75%?
-- **Desempenho por perfil de turma:** Como a composição das turmas (tamanho, série, turno) se correlaciona com desempenho nas avaliações?
-
-**Entregue**: Mart(s) materializados como table ou incremental, com `schema.yml` contendo descrições, e uma breve análise dos resultados (pode ser no README ou em um notebook auxiliar).
-
----
-
-## Parte 2: Testes e Qualidade de Dados
-
-**Esta é a parte mais importante do desafio.** A confiabilidade dos dados do RMI depende de uma estratégia sólida de testes.
-
-### 5. Testes Genéricos
-
-Aplique testes built-in do dbt (`unique`, `not_null`, `accepted_values`, `relationships`) nos models de staging e marts. A cobertura deve ser intencional — não basta testar tudo mecanicamente, queremos ver critério na escolha do que testar e por quê.
-
-**Entregue**: Testes configurados nos `schema.yml`, todos passando com `dbt test`. Documente brevemente por que cada teste é relevante (pode ser em comentários no YAML ou no README).
-
-### 6. Testes de Regra de Negócio
-
-Crie **pelo menos 2 testes singular ou customizados** que validem regras de negócio educacionais. Exemplos:
-
-- "Nenhum registro de frequência deve ter data anterior à data de matrícula do aluno naquela turma"
-- "Todo aluno com movimentação de tipo 'abandono' deve ter sua última frequência registrada antes da data da movimentação"
-- "A soma de presença + ausência por aluno/dia não deve ultrapassar a carga horária da turma"
-
-**Entregue**: Testes implementados (em `tests/` ou como macros), passando com `dbt test`, com documentação explicando a regra validada e por que ela importa.
-
----
-
-## Parte 3: Documentação e Análise
-
-### 8. Documentação do Projeto
-
-Produza documentação que permita a um novo membro do time entender e dar manutenção ao projeto.
-
-**Entregue**: README.md com instruções de setup e execução, diagrama ou descrição do lineage (staging → intermediate → marts), decisões de arquitetura (materializations, naming conventions, estratégia de testes), trade-offs identificados e o que faria diferente com mais tempo.
-
-### 9. Análise Exploratória (opcional, diferencial)
-
-Elabore um notebook Python complementar com uma análise exploratória dos dados que justifique suas escolhas de modelagem.
-
-**Entregue**: Notebook documentado mostrando padrões encontrados nos dados, anomalias ou problemas de qualidade identificados, e como isso influenciou suas decisões no dbt.
-
----
-
-## Avaliação
-
-Você será avaliado em cada uma das categorias abaixo:
-
-- **Modelagem e arquitetura dbt**
-- **Estratégia de testes e qualidade**
-- **SQL e lógica analítica**
-- **Documentação e comunicação**
-
-Os melhores candidatos serão chamados para a etapa de entrevistas.
-
-**Dica**: profundidade importa mais que completude. Melhor ter menos models com testes excelentes e documentação clara do que muitos models superficiais.
-
-### Diferenciais
-
-- Uso de dbt packages (`dbt_utils`, `dbt_expectations`, `codegen`)
-- Configuração de `freshness` nas sources
-- Uso de tags, hooks ou exposures
-- Testes de data contracts
-- Análise exploratória complementar (Parte 3, questão 9)
-- Configuração de CI com `dbt build` em GitHub Actions
-
----
-
-## Estrutura Sugerida do Repositório
-
+```bash
+gcloud auth application-default login
 ```
-desafio-rmi-ds/
-├── README.md
+
+É necessário possuir as permissões adequadas para consultar as tabelas de origem e criar tabelas no dataset de destino.
+
+### Ajustar credênciais do BigQuery
+Como o desenvolvimento foi feito com um banco local, é fundamental que o arquivo `env_variables.sh` seja editando com as credências do ambiente no qual será execultado. 
+
+| Variável | Descrição |
+|---|---|
+| `DBT_SOURCE_PROJECT` | Projeto onde estão os dados originais. |
+| `DBT_SOURCE_DATASET` | Dataset onde estão as tabelas de origem. |
+| `DBT_LOCATION` | Região do BigQuery (US ou EU). |
+
+Conteúdo de env_variables.sh:
+```bash
+    export DBT_SOURCE_PROJECT="nome-do-seu-projeto-bigquery"
+    export DBT_SOURCE_DATASET="nome-do-seu-dataset-biquery"
+
+    export DBT_LOCATION="US"
+```
+
+Após ajustado, é recomendado execultar o comando a seguir para exportar as variáveis de ambiente antes de prosseguir:
+
+```bash
+                                            source env_variables.sh
+```
+
+## Execução
+
+Após o arquivo env.variable.sh ser atualizado e referênciado, o proximo passo é utilizar uma das seguintes funções:
+
+
+- **dbt run**: execulta os modelos nas etapas de staging, intermediate e marts.
+- **dbt test**: execulta os testes apenas. 
+- **dbt built**: execulta os modelos e aplicam os testes.
+
+Comando recomendado:
+```bash
+                                                  dbt run
+                                                     ou
+                                                  dbt built
+```
+
+## Arquitetura
+
+O pipeline está organizado em três camadas:
+
+```text
+Dados de origem (BigQuery)
+          |
+          v
+      STAGING
+          |
+          v
+    INTERMEDIATE
+          |
+          v
+       MARTS
+          |
+          v
+ Indicadores analíticos
+```
+
+
+Já o projeto possui a seguinte estrutura:
+```text
+desafio_rmi_ds
+├── analyses
+├── data
+│   ├── rmi-aluno
+│   ├── rmi-avaliacao
+│   ├── rmi-escola
+│   ├── rmi-frequencia
+│   ├── rmi-schema.yml
+│   └── rmi-turma
 ├── dbt_project.yml
-├── packages.yml              # (se usar dbt packages)
-├── models/
-│   ├── staging/
-│   │   ├── stg_educacao__aluno.sql
-│   │   ├── stg_educacao__escola.sql
-│   │   ├── ...
-│   │   └── schema.yml
-│   ├── intermediate/
-│   │   ├── int_educacao__aluno_frequencia.sql
-│   │   └── schema.yml
-│   └── marts/
-│       ├── mart_educacao__absenteismo.sql
-│       └── schema.yml
-├── tests/                    # Testes singular
-├── macros/                   # Macros customizadas
-├── seeds/                    # Dados auxiliares (se aplicável)
-├── notebooks/                # (opcional) Análise exploratória
-│   └── eda.ipynb
-├── data/                     # Parquets baixados (não commitar)
-│   └── .gitkeep
-└── requirements.txt
+├── env_variables.sh
+├── logs
+│   └── dbt.log
+├── macros
+├── models
+│   ├── intermediate
+│   │   └── int_educacao_aluno_frequencia.sql
+│   ├── marts
+│   │   ├── mart_educacao_absenteismo_1.sql
+│   │   └── schema.yml
+│   ├── sources
+│   └── staging
+│       ├── schema.yml
+│       ├── stg_aluno_limpo.sql
+│       ├── stg_avaliacao_limpo.sql
+│       ├── stg_escola_limpo.sql
+│       ├── stg_frequencia_limpo.sql
+│       └── stg_turma_limpo.sql
+├── README.md
+├── seeds
+└── tests
 ```
 
----
+### Camada Staging
 
-## FAQ
+Camada responsável pela limpeza e padronização dos dados de origem.
 
-**1. Preciso usar BigQuery como warehouse?**
-Sim, BigQuery é o warehouse do projeto. Os Parquets são carregados via `bq load` para dataset raw do BigQuery Sandbox. O importante é que o projeto dbt funcione end-to-end.
+Principais operações:
 
-**4. Os dados estão anonimizados — posso confiar nas relações entre tabelas?**
-Sim. As chaves de relacionamento (IDs de aluno, escola, turma) foram preservadas consistentemente entre as tabelas. As distribuições estatísticas foram mantidas, mas os valores individuais foram aleatorizados.
+- Remoção de registros sem identificadores essenciais.
+- Tratamento de valores nulos e inválidos.
+- Padronização de categorias.
+- Validação de intervalos numéricos.
+- Validação de datas e períodos.
+- Tratamento de registros inconsistentes.
 
-**5. Preciso fazer todas as partes?**
-Sim, exceto a Parte 3 questão 9 (análise exploratória), que é opcional. Mas profundidade importa mais que completude — melhor fazer menos com excelência.
+Modelos:
 
-**6. Posso usar dbt packages?**
-Sim, e é um diferencial! Sugestões: `dbt_utils`, `dbt_expectations`, `codegen`.
+| Modelo | Descrição |
+|---|---|
+| `stg_aluno_limpo` | Limpeza e padronização dos dados dos alunos. |
+| `stg_avaliacao_limpo` | Tratamento de avaliações e notas por disciplina. |
+| `stg_escola_limpo` | Padronização dos dados das escolas. |
+| `stg_frequencia_limpo` | Tratamento dos registros de frequência escolar. |
+| `stg_turma_limpo` | Limpeza e padronização dos dados das turmas. |
+
+**Observação:** O sufixo "_limpo" foi escolhido apenas para diferênciar das tabelas originais do banco. Estas tabelas possuem as mesmas informações, porém passaram por um processo de limpeza (eliminação de is_aluno nulos, substituição de valores indesejados na categoria Faixa Etária e etc..).
+
+### Camada Intermediate
+
+Camada responsável por integrar informações provenientes dos modelos de staging e preparar os dados para análises posteriores.
+
+Modelo:
+
+**`int_educacao_aluno_frequencia`**
+
+Premissas:
+- Models **stg_aluno_limpo**, **stg_frequencia_limpo** e **stg_escola_limpo** já devem ter sido execultados sem nenhum erro. 
+
+Tipos de Join:
+- stg_aluno_limpo **RIGHT JOIN** stg_frequencia_limpo: Como o objetivo final é a avaliação da frequência, é fundamental que todos os registros tenham dados de frequência, assim o stg_aluno_limpo serve para esriquecimento dos dados como faixa etária e bairro de residência do aluno.
+- stg_frequencia_limpo **LEFT JOIN** stg_escola_limpo: Utilizamos stg_escola_limpo para enriquecimento do Bairro da Escola. 
+- Vale a pena observar que o stg_frequencia_limpo passar por um preprocessamento na própria query antes dop joins. 
+
+Principais operações:
+
+- Integração dos dados de alunos, escolas e frequência.
+- Consolidação dos registros por aluno, turma, escola e período.
+- Transformação dos registros de frequência em indicadores por disciplina.
+- Preparação da granularidade analítica para os modelos de negócio.
+
+### Camada Marts
+
+Camada responsável pela construção dos indicadores analíticos.
+
+Modelo:
+
+**`mart_educacao_absenteismo_1`**
+
+Premissas:
+- O model **int_educacao_aluno_frequencia** já deve ter sido execultados sem nenhum erro. 
+
+Objetivo: identificar escolas com maior incidência de alunos cuja frequência média esteja abaixo de 75%.
+
+Indicadores produzidos:
+
+| Indicador | Descrição |
+|---|---|
+| `total_alunos` | Total de alunos considerados na escola. |
+| `alunos_absenteismo` | Alunos com frequência média inferior a 75%. |
+| `alunos_frequencia_adequada` | Alunos com frequência média igual ou superior a 75%. |
+| `media_frequencia_escola` | Média de frequência dos alunos da escola. |
+| `taxa_absenteismo` | Percentual de alunos classificados em situação de absenteísmo. |
+| `classificacao_absenteismo` | Classificação do nível de absenteísmo da escola. |
+
+Critérios de classificação:
+
+| Taxa de absenteísmo | Classificação |
+|---|---|
+| >= 25% | Crítico |
+| >= 15% e < 25% | Alto |
+| >= 10% e < 15% | Moderado |
+| < 10% | Baixo |
+
+**Observação:** os limites acima são critérios analíticos definidos para este projeto, não necessariamente classificações oficiais de órgãos educacionais.
 
 
-Boa sorte! 🚀
+## Testes de qualidade de dados
+
+O projeto utiliza testes nativos do dbt e testes singulares para verificar a integridade dos dados e a consistência das regras de negócio.
+
+### Testes genéricos
+
+Configurados nos arquivos `schema.yml`, os testes genéricos validam a qualidade e a consistência dos dados nas tabelas de staging.
+
+São utilizados quatro tipos de testes:
+
+- `not_null`: verifica se uma coluna não contém valores nulos. É aplicado a campos considerados obrigatórios, como identificadores de alunos, turmas e escolas, além das datas de início e fim dos registros de frequência.
+- `unique`: verifica se os valores de uma coluna são únicos, garantindo que não existam identificadores duplicados. É aplicado ao campo `id_escola` da tabela `stg_escola_limpo`.
+- `accepted_values`: verifica se os valores de uma coluna pertencem a um conjunto previamente definido. É utilizado para validar categorias como faixas etárias, bimestres e disciplinas, identificando valores fora dos padrões estabelecidos.
+- `relationships`: verifica a integridade referencial entre modelos, garantindo que os identificadores de uma tabela correspondam a registros existentes em outra. É aplicado ao campo `id_escola` de `stg_frequencia_limpo`, verificando sua correspondência com `id_escola` em `stg_escola_limpo`.
+
+**Aplicação por modelo:**
+
+- `stg_aluno_limpo`: verifica a presença dos identificadores de aluno e turma e valida os valores permitidos para faixa etária.
+- `stg_avaliacao_limpo`: verifica a presença dos identificadores de aluno e turma e valida os valores permitidos para bimestre.
+- `stg_escola_limpo`: verifica se o identificador da escola está preenchido e se não existem identificadores duplicados.
+- `stg_frequencia_limpo`: verifica o preenchimento dos identificadores de escola, aluno e turma, bem como das datas de início e fim. Também valida os valores permitidos para disciplina e a integridade referencial entre escolas e registros de frequência.
+
+Esses testes permitem identificar problemas de preenchimento, duplicidade, padronização e integridade referencial antes que os dados sejam utilizados nas etapas seguintes do pipeline.
+
+### Testes de singularidade
+
+Implementados por meio de consultas SQL na pasta `tests/`, os testes de singularidade validam regras de negócio e a consistência dos resultados produzidos pelo modelo `mart_educacao_absenteismo_1`.
+
+São utilizados dois testes:
+
+- `assert_educacao_absenteismo_1_contagem`: Verifica a consistência das contagens de alunos por escola. Garante que os valores de total_alunos, alunos_absenteismo e alunos_frequencia_adequada não sejam negativos e que o total de alunos corresponda à soma dos alunos classificados com absenteísmo e os com frequência adequada. Essa validação é relevante serve para assegurar a integridade dos dados após sua agregação, assim evitando divergências nas contagens e garantindo que todos os alunos sejam contabilizados corretamente nas classificações de frequência, evitando distorções nos indicadores e nas análises.
+
+- `assert_educacao_absenteismo_1_classificacao`: Verifica a consistência dos indicadores de frequência e absenteísmo. Garante que a média de frequência escolar e a taxa de absenteísmo estejam dentro dos limites aceitáveis (0% e 100%). Também valida se a taxa de absenteísmo corresponde ao percentual calculado a partir da quantidade de alunos com absenteísmo em relação ao total de alunos. Ela serve para assegurar a confiabilidade dos indicadores educacionais, evitar inconsistências nos percentuais apresentados.
+
+Classificação atribuída à escola está de acordo com os limites definidos (sugestão):
+  - **Crítico:** taxa de absenteísmo maior ou igual a 25%.
+  - **Alto:** taxa maior ou igual a 15% e menor que 25%.
+  - **Moderado:** taxa maior ou igual a 10% e menor que 15%.
+  - **Baixo:** taxa inferior a 10%.
+
+
+## Considerações e limitações
+
+
+
+## Melhorias futuras
+
+
+
+## Autor
+
+Nome: Artur Knupp
+E-mail: knupp@poli.ufrj.br 
+

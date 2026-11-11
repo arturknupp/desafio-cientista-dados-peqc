@@ -1,0 +1,100 @@
+version: 2
+
+models:
+
+  - name: mart_educacao_absenteismo_1
+
+    description: >
+      O mart_educacao_absenteismo_1 unifica indicadores de frequência
+      dos alunos por escola e bairro. Ela identifica a proporção
+      de alunos com frequência média inferior a 75% nas
+      quatro disciplinas, assim permitindo identificar quais escolas
+      estão em estado crítico. 
+
+    columns:
+
+      - name: id_escola
+        description: >
+          Identificador único da escola. 
+
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_escola_limpo')
+                field: id_escola
+
+
+      - name: bairro_da_escola
+        description: >
+          O bairro onde a escola está localizada.
+
+      - name: total_alunos
+        description: >
+          A quantidade de alunos que foram considerados no cálculo
+          nos indicadores de frequência.
+
+        data_tests:
+          - not_null
+
+      - name: alunos_absenteismo
+        description: >
+          A quantidade de alunos que a média de frequência
+          nas disciplinas disponíveis é inferior a 75%.
+
+        data_tests:
+          - not_null
+
+
+      - name: alunos_frequencia_adequada
+        description: >
+          A qantidade de alunos que a média de frequência
+          nas disciplinas disponíveis é igual ou maior que
+          75%.
+
+        data_tests:
+          - not_null
+
+
+      - name: media_frequencia_escola
+        description: >
+          A média dos percentuais de frequência dos alunos
+          considerados na escola. 
+
+        data_tests:
+          - not_null
+
+
+      - name: taxa_absenteismo
+        description: >
+          O percentual de alunos com frequência média
+          menor que 75% em relação ao total de alunos
+          considerados na escola. 
+
+
+        data_tests:
+          - not_null
+
+
+
+      - name: classificacao_absenteismo
+        description: >
+          Classificação da escola de acordo com sua taxa
+          de absenteísmo:
+
+          - Crítico: taxa igual ou maior que 25%.
+          - Alto: taxa igual ou maior que 15% e inferior a 25%.
+          - Moderado: taxa igual ou maior que 10% e inferior a 15%.
+          - Baixo: taxa inferior a 10%.
+
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Crítico
+                  - Alto
+                  - Moderado
+                  - Baixo
+

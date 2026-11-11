@@ -1,0 +1,258 @@
+
+version: 2
+
+sources:
+  - name: educacao_raw
+    description: >
+      Conjunto de tabelas originais da base educacional.
+      Ela representa os dados recebidos antes das transformações
+      e validações performadas pelo dbt.
+    database: "{{ env_var('DBT_SOURCE_PROJECT') }}"
+    schema: "{{ env_var('DBT_SOURCE_DATASET') }}"
+    tables:
+      - name: stg_aluno
+        description: >
+          Tabela de cadastro de alunos anonimizada e aleatorizada para o ano letivo
+          de 2025, com faixas etárias e bairros anonimizados.
+        columns:
+          - name: id_aluno
+            description: Identificador único do aluno na base de dados.
+          - name: id_turma
+            description: Identificador único da turma (Hash com salt aplicado sobre o id_turma original).
+          - name: faixa_etaria
+            description: >
+              Faixa etária do aluno agrupada para evitar reidentificação
+              (ex: 0-5, 6-10, 11-14, 15-17, 18+). Derivada da coluna idade_atual.
+          - name: bairro
+            description: Hash do bairro de residência do aluno (aplicado sobre o campo bairro original).
+
+      - name: stg_avaliacao
+        description: >
+          Notas e avaliações dos alunos por bimestre e disciplina. Os valores
+          originais (0.0 a 10.0) receberam um ruído determinístico (jitter +/- 0.2)
+          para anonimização.
+        columns:
+          - name: id_aluno
+            description: Identificador único do aluno na base de dados.
+          - name: id_turma
+            description: Identificador único da turma (Hash com salt).
+          - name: frequencia
+            description: Percentual de frequência geral do aluno no bimestre (campo original da tabela de avaliação).
+          - name: bimestre
+            description: Identificador do bimestre (id_coc), variando de 1 a 4.
+          - name: disciplina_1
+            description: Nota em Língua Portuguesa com aplicação de jitter aleatório.
+          - name: disciplina_2
+            description: Nota em Ciências com aplicação de jitter aleatório.
+          - name: disciplina_3
+            description: Nota em Língua Estrangeira (Inglês) com aplicação de jitter aleatório.
+          - name: disciplina_4
+            description: Nota em Matemática com aplicação de jitter aleatório.
+
+      - name: stg_escola
+        description: >
+          Cadastro de unidades escolares pertencentes à rede municipal, com
+          identificadores e localização anonimizados via hashing.
+        columns:
+          - name: id_escola
+            description: Identificador único da unidade escolar na base de dados (Hash com salt aplicado sobre o id_escola original).
+          - name: bairro
+            description: Hash do bairro onde a unidade escolar está localizada (aplicado sobre o campo bairro original).
+
+      - name: stg_frequencia
+        description: >
+          Registros de frequência escolar por disciplina e período, com mapeamento
+          consistente de IDs de alunos e anonimização de datas.
+        columns:
+          - name: id_escola
+            description: Identificador único da unidade escolar (Hash com salt).
+          - name: id_aluno
+            description: Identificador único do aluno, mapeado para garantir consistência com a tabela stg_aluno.
+          - name: id_turma
+            description: Identificador único da turma (Hash com salt).
+          - name: data_inicio
+            description: Data de início do período de apuração da frequência (Ano anonimizado para 2000).
+          - name: data_fim
+            description: Data de fim do período de apuração da frequência (Ano anonimizado para 2000).
+          - name: disciplina
+            description: >
+              Nome da disciplina mapeado para identificadores genéricos
+              (disciplina_1: Português, disciplina_2: Ciências,
+              disciplina_3: Inglês, disciplina_4: Matemática).
+          - name: frequencia
+            description: >
+              Percentual de frequência calculado como
+              100 - (faltas_disciplina / dias_letivos).
+
+      - name: stg_turma
+        description: >
+          Relacionamento entre alunos e turmas para o ano letivo, com dados de
+          tempo anonimizados.
+
+models:
+  - name: stg_aluno_limpo
+    description: >
+      Cadastro de alunos após padronização e limpeza, derivado de uma base
+      anonimizada e aleatorizada para o ano letivo de 2025. Remove registros
+      sem identificador de aluno e padroniza as faixas etárias anonimizadas.
+    columns:
+      - name: id_aluno
+        description: Identificador único do aluno na base de dados.
+        data_tests:
+          - not_null
+
+      - name: id_turma
+        description: Identificador único da turma (Hash com salt aplicado sobre o id_turma original).
+        data_tests:
+          - not_null
+
+      - name: faixa_etaria
+        description: >
+          Faixa etária do aluno agrupada para evitar reidentificação
+          (0-5, 6-10, 11-14, 15-17, 18+). Derivada da coluna idade_atual.
+          Os valores fora das categorias são classificados como Desconhecida.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - '0-5'
+                  - '6-10'
+                  - '11-14'
+                  - '15-17'
+                  - '18+'
+                  - 'Desconhecida'
+
+      - name: bairro
+        description: Hash do bairro de residência do aluno (aplicado sobre o campo bairro original).
+
+  - name: stg_avaliacao_limpo
+    description: >
+      Notas e avaliações dos alunos por bimestre e disciplina,
+      derivadas de uma base anonimizada. Os valores originais
+      (0.0 a 10.0) receberam ruído determinístico (jitter +/- 0.2)
+      para anonimização. Padroniza os bimestres e limita os valores
+      de frequência e notas aos seus respectivos intervalos permitidos.
+    columns:
+      - name: id_aluno
+        description: Identificador único do aluno na base de dados.
+        data_tests:
+          - not_null
+
+      - name: id_turma
+        description: Identificador único da turma (Hash com salt aplicado sobre o id_turma original).
+        data_tests:
+          - not_null
+
+      - name: frequencia
+        description: >
+          Percentual de frequência geral do aluno no bimestre,
+          correspondente ao campo original da tabela de avaliação,
+          limitado ao intervalo entre 0 e 100.
+
+      - name: bimestre
+        description: >
+          Identificador do bimestre (id_coc), variando de 1 a 4.
+          Valores inválidos são classificados como Desconhecido.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - '1'
+                  - '2'
+                  - '3'
+                  - '4'
+                  - 'Desconhecido'
+
+      - name: disciplina_1
+        description: Nota em Língua Portuguesa com aplicação de jitter aleatório, limitada entre 0 e 10.
+
+      - name: disciplina_2
+        description: Nota em Ciências com aplicação de jitter aleatório, limitada entre 0 e 10.
+
+      - name: disciplina_3
+        description: Nota em Língua Estrangeira (Inglês) com aplicação de jitter aleatório, limitada entre 0 e 10.
+
+      - name: disciplina_4
+        description: Nota em Matemática com aplicação de jitter aleatório, limitada entre 0 e 10.
+
+  - name: stg_escola_limpo
+    description: >
+      Cadastro de unidades escolares pertencentes à rede municipal,
+      com identificadores e localização anonimizados via hashing.
+      Remove registros sem identificador de escola.
+    columns:
+      - name: id_escola
+        description: Identificador único da unidade escolar na base de dados (Hash com salt aplicado sobre o id_escola original).
+        data_tests:
+          - not_null
+          - unique
+
+      - name: bairro
+        description: Hash do bairro onde a unidade escolar está localizada (aplicado sobre o campo bairro original).
+
+  - name: stg_frequencia_limpo
+    description: >
+      Registros de frequência escolar por disciplina e período,
+      com mapeamento consistente de IDs de alunos e anonimização
+      de datas. Remove registros sem identificadores obrigatórios,
+      valida os períodos e padroniza as disciplinas e os percentuais
+      de frequência.
+    columns:
+      - name: id_escola
+        description: Identificador único da unidade escolar (Hash com salt).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_escola_limpo')
+                field: id_escola
+
+      - name: id_aluno
+        description: Identificador único do aluno, mapeado para garantir consistência com a tabela stg_aluno.
+        data_tests:
+          - not_null
+
+      - name: id_turma
+        description: Identificador único da turma (Hash com salt).
+        data_tests:
+          - not_null
+
+      - name: data_inicio
+        description: Data de início do período de apuração da frequência (Ano anonimizado para 2000).
+        data_tests:
+          - not_null
+
+      - name: data_fim
+        description: Data de fim do período de apuração da frequência (Ano anonimizado para 2000).
+        data_tests:
+          - not_null
+
+      - name: disciplina
+        description: >
+          Nome da disciplina mapeado para identificadores genéricos
+          (disciplina_1: Português, disciplina_2: Ciências,
+          disciplina_3: Inglês, disciplina_4: Matemática).
+          Valores não reconhecidos são classificados como Desconhecido.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'disciplina_1'
+                  - 'disciplina_2'
+                  - 'disciplina_3'
+                  - 'disciplina_4'
+                  - 'Desconhecido'
+
+      - name: frequencia
+        description: >
+          Percentual de frequência calculado como
+          100 - (faltas_disciplina / dias_letivos),
+          limitado ao intervalo entre 0 e 100.
+          Valores nulos são preservados.
+
+  - name: stg_turma_limpo
+    description: >
+      Relacionamento entre alunos e turmas para o ano letivo,
+      com identificadores anonimizados via hashing e dados
+      de tempo anonimizados de forma determinística para o ano 2000.
+
