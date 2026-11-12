@@ -75,13 +75,13 @@ Após o arquivo env.variable.sh ser atualizado e referênciado, o proximo passo 
 
 - **dbt run**: execulta os modelos nas etapas de staging, intermediate e marts.
 - **dbt test**: execulta os testes apenas. 
-- **dbt built**: execulta os modelos e aplicam os testes.
+- **dbt build**: execulta os modelos e aplicam os testes.
 
 Comando recomendado:
 ```bash
                                                   dbt run
                                                      ou
-                                                  dbt built
+                                                  dbt build
 ```
 
 ## Arquitetura
@@ -109,17 +109,8 @@ Já o projeto possui a seguinte estrutura:
 ```text
 desafio_rmi_ds
 ├── analyses
-├── data
-│   ├── rmi-aluno
-│   ├── rmi-avaliacao
-│   ├── rmi-escola
-│   ├── rmi-frequencia
-│   ├── rmi-schema.yml
-│   └── rmi-turma
 ├── dbt_project.yml
 ├── env_variables.sh
-├── logs
-│   └── dbt.log
 ├── macros
 ├── models
 │   ├── intermediate
@@ -135,9 +126,11 @@ desafio_rmi_ds
 │       ├── stg_escola_limpo.sql
 │       ├── stg_frequencia_limpo.sql
 │       └── stg_turma_limpo.sql
-├── README.md
 ├── seeds
+├── snapshots
 └── tests
+    ├── assert_educacao_absenteismo_1_classificacao.sql
+    └── assert_educacao_absenteismo_1_contagem.sql
 ```
 
 ### Camada Staging
@@ -224,6 +217,16 @@ Critérios de classificação:
 **Observação:** os limites acima são critérios analíticos definidos para este projeto, não necessariamente classificações oficiais de órgãos educacionais.
 
 
+**Análise**
+
+Após analisar o resultado do modelo MART, foi possível verificar que todos os registros de frequência dos alunos da tabela `stg_frequencia` estão muito altos. O que levanta a suspeita sobre a confiabilidade dos dados.
+Alguns números:
+- Frequência Mínima da Tabela stg_frequencia é 97,33
+- Frequência Média Mínima das Escolas é 99,8, enquanto a Máxima é 100%
+- 100% da amostra tem baixa classificação de risco de absenteísmo.
+
+**O que poderia ser melhorado?** Também há um campo de frequência, só que por bimestre, na tabela `stg_avaliacao` que apresentava resultados diferentes. Uma possibilidade seria criar um modelo INTERMEDIATE e um MART baseado nessa tabela e assim comparar os resultados e avaliar se ela apresentava alguma realidade diferente sobre o absenteísmo.
+
 ## Testes de qualidade de dados
 
 O projeto utiliza testes nativos do dbt e testes singulares para verificar a integridade dos dados e a consistência das regras de negócio.
@@ -267,14 +270,20 @@ Classificação atribuída à escola está de acordo com os limites definidos (s
 
 ## Considerações e limitações
 
+- Devido a forma que o id_aluno foi mascarado, o campo foi tratado nos modelos como binário, diferente do `schema.yml`que acompanhava os dados e o classificava como string. Ao tentar converter para string, os registros apresentavam caracteres inválidos. Por isso, foi optado por manter seu tipo em binário. 
 
 
 ## Melhorias futuras
 
-
+- Inicialmente, a intenção era fazer uma única tabela intermediária que unificasse os dados das cinco tabelas de forma denomarlizada. Assim seria possível uma gama mais ampla de análises sem necessidade de recorrer a múltiplas tabelas. 
+- Dashboard interativos e gráficos poderiam ser implementados para ajudar na compreenção dos dados.
+- Análisar a correlação dos indicadores com a performance de acordo com a tabela de avaliação, nos permitindo compreender quais aspectos afetam mais o rendimento escolar e servir de base para tomada de decisões. 
+- Buscar formas de indentificar alunos em situação de risco academico baseado na frequencia, avaliações e distância entre casa e escola. 
+- Análise que permita medir a desiguadade entre escolas baseada no rendimento dos alunos. 
 
 ## Autor
 
 Nome: Artur Knupp
+
 E-mail: knupp@poli.ufrj.br 
 
